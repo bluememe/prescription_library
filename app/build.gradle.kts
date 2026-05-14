@@ -20,6 +20,35 @@ android {
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
+
+    signingConfigs {
+        create("release") {
+            // You will need to create a keystore file and provide the details here
+            // storeFile = file("path/to/your/keystore.jks")
+            // storePassword = "your_password"
+            // keyAlias = "your_alias"
+            // keyPassword = "your_password"
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // signingConfig = signingConfigs.getByName("release")
+        }
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+        }
+    }
+
+    applicationVariants.all {
+        outputs.forEach { output ->
+            val apkOutput = output as? com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            apkOutput?.outputFileName = "Aushadh.apk"
+        }
+    }
 }
 
 dependencies {
