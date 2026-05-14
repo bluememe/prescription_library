@@ -1,0 +1,33 @@
+# Built artifacts
+**/build/
+*.apk
+*.aar
+*.ap_
+*.der
+*.class
+
+# Android Studio / IntelliJ files
+.idea/
+*.iml
+*.iws
+*.ipr
+.gradle/
+.kotlin/
+
+# Local configuration
+local.properties
+
+# Secrets
+secrets.xml
+*.keystore
+*.jks
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
