@@ -8,8 +8,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -33,11 +35,12 @@ import java.util.*
 @Composable
 fun MainLibraryScreen(
     records: List<MedicalRecord>,
+    searchQuery: String,
     onRecordClick: (MedicalRecord) -> Unit,
-    onSearch: (String) -> Unit
+    onSearch: (String) -> Unit,
+    onAddClick: () -> Unit,
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var showBackupDialog by remember { mutableStateOf(false) }
+    val (showBackupDialog, setShowBackupDialog) = remember { mutableStateOf(false) }
     var backupResultPath by remember { mutableStateOf<String?>(null) }
     var selectedRestoreUri by remember { mutableStateOf<Uri?>(null) }
     
@@ -57,19 +60,25 @@ fun MainLibraryScreen(
                             "Aushadh",
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
-                        IconButton(onClick = { showBackupDialog = true }) {
-                            Icon(Icons.Default.Lock, contentDescription = "Security", tint = Color(0xFF2E7D32), modifier = Modifier.size(32.dp))
+                        IconButton(
+                            onClick = { 
+                                setShowBackupDialog(true)
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Lock, 
+                                contentDescription = "Security", 
+                                tint = Color(0xFF2E7D32), 
+                                modifier = Modifier.size(32.dp)
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { 
-                            searchQuery = it
-                            onSearch(it)
-                        },
+                        onValueChange = onSearch,
                         placeholder = { Text("Search records...", fontSize = 18.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -77,7 +86,23 @@ fun MainLibraryScreen(
                     )
                 }
             }
-        }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddClick,
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(72.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add, 
+                    contentDescription = "Add Record", 
+                    modifier = Modifier.size(40.dp),
+                    tint = Color.White
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
@@ -85,8 +110,10 @@ fun MainLibraryScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(records) { record ->
-                RecordCard(record = record, onClick = { onRecordClick(record) })
+                RecordCard(record = record) { onRecordClick(record) }
             }
+            // Spacer to prevent FAB from covering last item
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
 
         // SECURITY DIALOG (Backup & Restore)
@@ -94,14 +121,14 @@ fun MainLibraryScreen(
             var password by remember { mutableStateOf("") }
             AlertDialog(
                 onDismissRequest = { 
-                    showBackupDialog = false
+                    setShowBackupDialog(false)
                     selectedRestoreUri = null
                     backupResultPath = null
                 },
                 title = { Text(if (selectedRestoreUri == null) "Backup & Security" else "Restore Data", fontSize = 22.sp) },
                 text = {
                     Column {
-                        if (selectedRestoreUri == null && backupResultPath == null) {
+                        if ((selectedRestoreUri == null) && (backupResultPath == null)) {
                             Text("Secure your medical library.", fontSize = 16.sp)
                             Spacer(modifier = Modifier.height(16.dp))
                             OutlinedTextField(
@@ -131,27 +158,29 @@ fun MainLibraryScreen(
                 confirmButton = {
                     val btnText = if (selectedRestoreUri != null) "CONFIRM RESTORE" else "BACKUP NOW"
                     if (backupResultPath == null) {
-                        Button(onClick = {
-                            if (selectedRestoreUri != null) {
-                                // RESTORE LOGIC
-                                val tempFile = File(context.cacheDir, "temp_restore.aushadh")
-                                context.contentResolver.openInputStream(selectedRestoreUri!!)?.use { input ->
-                                    FileOutputStream(tempFile).use { output -> input.copyTo(output) }
-                                }
-                                if (BackupUtility.restoreBackup(context, password, tempFile)) {
-                                    Toast.makeText(context, "Restore Success! Restarting...", Toast.LENGTH_LONG).show()
-                                    showBackupDialog = false
+                        Button(
+                            onClick = {
+                                if (selectedRestoreUri != null) {
+                                    // RESTORE LOGIC
+                                    val tempFile = File(context.cacheDir, "temp_restore.aushadh")
+                                    context.contentResolver.openInputStream(selectedRestoreUri!!)?.use { input ->
+                                        FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+                                    }
+                                    if (BackupUtility.restoreBackup(context, password, tempFile)) {
+                                        Toast.makeText(context, "Restore Success! Restarting...", Toast.LENGTH_LONG).show()
+                                        setShowBackupDialog(false)
+                                    } else {
+                                        Toast.makeText(context, "Invalid Password or File", Toast.LENGTH_SHORT).show()
+                                    }
                                 } else {
-                                    Toast.makeText(context, "Invalid Password or File", Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                // BACKUP LOGIC
-                                val backupFile = File(context.getExternalFilesDir(null), "Aushadh_Backup.aushadh")
-                                if (BackupUtility.exportBackup(context, password, backupFile)) {
-                                    backupResultPath = backupFile.absolutePath
+                                    // BACKUP LOGIC
+                                    val backupFile = File(context.getExternalFilesDir(null), "Aushadh_Backup.aushadh")
+                                    if (BackupUtility.exportBackup(context, password, backupFile)) {
+                                        backupResultPath = backupFile.absolutePath
+                                    }
                                 }
                             }
-                        }) {
+                        ) {
                             Text(btnText)
                         }
                     }
@@ -178,7 +207,7 @@ fun RecordCard(record: MedicalRecord, onClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (record.doctorName.isNotBlank()) "Dr. ${record.doctorName}" else "Unknown Doctor",
+                    text = record.doctorName.ifBlank { "Unknown Doctor" },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
